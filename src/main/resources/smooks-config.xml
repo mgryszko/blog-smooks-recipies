@@ -1,0 +1,44 @@
+<?xml version="1.0"?>
+<smooks-resource-list xmlns="http://www.milyn.org/xsd/smooks-1.1.xsd"
+    xmlns:csv="http://www.milyn.org/xsd/smooks/csv-1.3.xsd"
+    xmlns:jb="http://www.milyn.org/xsd/smooks/javabean-1.3.xsd">
+
+    <params>
+        <param name="stream.filter.type">SAX</param>
+    </params>
+
+    <csv:reader fields="description,priorityCode,reporter,assignee,createdDate,createdTime,updatedDate,updatedTime" skipLines="1"/>
+
+    <jb:bean beanId="transformedProps" class="java.util.HashMap" createOnElement="csv-record">
+        <jb:value property="@reporter" data="csv-record/reporter" />
+        <jb:value property="@assignee" data="csv-record/assignee" />
+        <jb:value property="@updatedDate" data="csv-record/updatedDate"/>
+        <jb:value property="@updatedTime" data="csv-record/updatedTime"/>
+    </jb:bean>
+
+    <jb:bean beanId="issues" class="java.util.ArrayList" createOnElement="csv-set">
+        <jb:wiring beanIdRef="issue" />
+    </jb:bean>
+
+    <jb:bean beanId="issue" class="com.tsl.smooks.model.Issue" createOnElement="csv-record">
+        <jb:value property="description" data="csv-record/description" />
+        <jb:wiring property="project" beanIdRef="project" />
+        <jb:expression property="priority" execOnElement="csv-record/priorityCode">
+            prioritizer.assignPriorityFromCode(_VALUE)
+        </jb:expression>
+        <jb:expression property="involvedPersons" execOnElement="csv-record">
+            transformedProps["reporter"]
+                + (org.apache.commons.lang.StringUtils.isNotBlank(transformedProps["assignee"]) ? ";" + transformedProps["assignee"] : "")
+        </jb:expression>
+        <jb:value property="createdDatePart" decoder="Date" data="csv-record/createdDate">
+            <jb:decodeParam name="format">yyyy-MM-dd</jb:decodeParam>
+        </jb:value>
+        <jb:value property="createdTimePart" decoder="Date" data="csv-record/createdTime">
+            <jb:decodeParam name="format">HH:mm</jb:decodeParam>
+        </jb:value>
+        <jb:expression property="updated" execOnElement="csv-record">
+            updated = transformedProps["updatedDate"] + " " + transformedProps["updatedTime"];
+            new java.text.SimpleDateFormat("yyyy-MM-dd HH:mm").parse(updated)
+        </jb:expression>
+    </jb:bean>
+</smooks-resource-list>
